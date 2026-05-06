@@ -284,6 +284,12 @@ st.markdown("""
 
 st.markdown("---")
 
+# ── Session State Init ──────────────────────────────────────
+if "email_text" not in st.session_state:
+    st.session_state.email_text = ""
+if "result" not in st.session_state:
+    st.session_state.result = None
+
 # Sample emails for quick testing
 SAMPLES = {
     "🔴 Spam Example"     : "CONGRATULATIONS!! You have WON $1,000,000!! Click here NOW to claim your FREE prize! Limited time offer! Act now! Buy now and save big!",
@@ -293,111 +299,135 @@ SAMPLES = {
 
 st.markdown('<div class="section-label">⚡ Quick Test Samples</div>', unsafe_allow_html=True)
 col1, col2, col3 = st.columns(3)
-selected_sample = None
 with col1:
     if st.button("🔴 Spam Sample"):
-        selected_sample = SAMPLES["🔴 Spam Example"]
+        st.session_state.email_text = SAMPLES["🔴 Spam Example"]
+        st.session_state.result = None
 with col2:
     if st.button("🟠 Phishing Sample"):
-        selected_sample = SAMPLES["🟠 Phishing Example"]
+        st.session_state.email_text = SAMPLES["🟠 Phishing Example"]
+        st.session_state.result = None
 with col3:
     if st.button("🟢 Legit Sample"):
-        selected_sample = SAMPLES["🟢 Legit Example"]
+        st.session_state.email_text = SAMPLES["🟢 Legit Example"]
+        st.session_state.result = None
 
 st.markdown('<br>', unsafe_allow_html=True)
 st.markdown('<div class="section-label">✏️ Or paste your own email</div>', unsafe_allow_html=True)
 
-default_text = selected_sample if selected_sample else ""
+# Key-bound text area — value syncs with session_state.email_text
 email_input = st.text_area(
     label="Email content",
-    value=default_text,
+    value=st.session_state.email_text,
     height=180,
     placeholder="Paste the email content here (subject + body)...",
     label_visibility="collapsed",
+    key="email_textarea",
 )
+# Keep session state in sync with manual edits
+st.session_state.email_text = email_input
 
-classify_btn = st.button("🔍 Classify Email")
+col_btn, col_clear = st.columns([4, 1])
+with col_btn:
+    classify_btn = st.button("🔍 Classify Email", use_container_width=True)
+with col_clear:
+    if st.button("🗑️ Clear", use_container_width=True):
+        st.session_state.email_text = ""
+        st.session_state.result = None
+        st.rerun()
 
 # ── Results ───────────────────────────────────────────────────
 if classify_btn:
-    if not email_input.strip():
+    if not st.session_state.email_text.strip():
         st.warning("⚠️ Please enter some email text first.")
     else:
         with st.spinner("Analyzing email..."):
-            label, proba_dict = predict(email_input)
-
-        icons  = {"spam": "🔴", "phishing": "🟠", "legitimate": "🟢"}
-        colors = {"spam": "#ef4444", "phishing": "#fb923c", "legitimate": "#34d399"}
-        css_cl = {"spam": "result-spam", "phishing": "result-phishing", "legitimate": "result-legitimate"}
-        desc   = {
-            "spam":       "This email appears to be unsolicited commercial or junk mail.",
-            "phishing":   "This email shows signs of a phishing or fraud attempt.",
-            "legitimate": "This email appears to be safe and legitimate.",
+            label, proba_dict = predict(st.session_state.email_text)
+        st.session_state.result = {
+            "label":      label,
+            "proba_dict": proba_dict,
+            "text":       st.session_state.email_text,
         }
 
-        confidence = round(proba_dict[label] * 100, 1)
+# Display stored result (persists across reruns)
+if st.session_state.result:
+    res        = st.session_state.result
+    label      = res["label"]
+    proba_dict = res["proba_dict"]
+    email_used = res["text"]
 
-        st.markdown("---")
-        st.markdown('<div class="section-label">📊 Classification Result</div>', unsafe_allow_html=True)
+    icons  = {"spam": "🔴", "phishing": "🟠", "legitimate": "🟢"}
+    colors = {"spam": "#ef4444", "phishing": "#fb923c", "legitimate": "#34d399"}
+    css_cl = {"spam": "result-spam", "phishing": "result-phishing", "legitimate": "result-legitimate"}
+    desc   = {
+        "spam":       "This email appears to be unsolicited commercial or junk mail.",
+        "phishing":   "This email shows signs of a phishing or fraud attempt.",
+        "legitimate": "This email appears to be safe and legitimate.",
+    }
 
-        # Main result card
+    confidence = round(proba_dict[label] * 100, 1)
+
+    st.markdown("---")
+    st.markdown('<div class="section-label">📊 Classification Result</div>', unsafe_allow_html=True)
+
+    # Main result card
+    st.markdown(f"""
+    <div class="{css_cl[label]}">
+        <div style="font-size:3rem; margin-bottom:0.2rem">{icons[label]}</div>
+        <div class="result-label" style="color:{colors[label]}">{label.upper()}</div>
+        <div class="result-conf">{desc[label]}</div>
+        <br>
+        <span class="metric-pill">Confidence: <strong>{confidence}%</strong></span>
+        <span class="metric-pill">Words: {len(email_used.split())}</span>
+        <span class="metric-pill">Characters: {len(email_used)}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Probability bars
+    st.markdown('<div class="section-label">📈 Probability Breakdown</div>', unsafe_allow_html=True)
+
+    bar_colors_map = {
+        "legitimate": "#34d399",
+        "phishing"  : "#fb923c",
+        "spam"      : "#ef4444",
+    }
+
+    for cls in ["legitimate", "spam", "phishing"]:
+        pct       = round(proba_dict[cls] * 100, 1)
+        bar_color = bar_colors_map[cls]
+        emoji     = icons[cls]
         st.markdown(f"""
-        <div class="{css_cl[label]}">
-            <div style="font-size:3rem; margin-bottom:0.2rem">{icons[label]}</div>
-            <div class="result-label" style="color:{colors[label]}">{label.upper()}</div>
-            <div class="result-conf">{desc[label]}</div>
-            <br>
-            <span class="metric-pill">Confidence: <strong>{confidence}%</strong></span>
-            <span class="metric-pill">Words: {len(email_input.split())}</span>
-            <span class="metric-pill">Characters: {len(email_input)}</span>
+        <div class="prob-bar-wrap">
+            <div class="prob-label">
+                <span>{emoji} {cls.capitalize()}</span>
+                <span><strong>{pct}%</strong></span>
+            </div>
+            <div class="prob-bar-bg">
+                <div class="prob-bar-fill" style="width:{pct}%; background:{bar_color};"></div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
+    # Key signals
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-label">🔎 Detected Signals</div>', unsafe_allow_html=True)
 
-        # Probability bars
-        st.markdown('<div class="section-label">📈 Probability Breakdown</div>', unsafe_allow_html=True)
+    signals = []
+    if re.search(r'http|www', email_used):      signals.append("🔗 Contains URL")
+    if re.search(r'\S+@\S+', email_used):       signals.append("📬 Contains Email Address")
+    if email_used.count('!') > 2:               signals.append(f"❗ {email_used.count('!')} Exclamation Marks")
+    if email_used.count('$') > 0:               signals.append(f"💰 {email_used.count('$')} Dollar Signs")
+    if email_used.count('?') > 2:               signals.append(f"❓ {email_used.count('?')} Question Marks")
+    upper_ratio = sum(1 for c in email_used if c.isupper()) / max(len(email_used), 1)
+    if upper_ratio > 0.2:                       signals.append(f"🔠 {round(upper_ratio*100)}% Uppercase Text")
 
-        bar_colors_map = {
-            "legitimate": "#34d399",
-            "phishing"  : "#fb923c",
-            "spam"      : "#ef4444",
-        }
-
-        for cls in ["legitimate", "spam", "phishing"]:
-            pct = round(proba_dict[cls] * 100, 1)
-            bar_color = bar_colors_map[cls]
-            emoji = icons[cls]
-            st.markdown(f"""
-            <div class="prob-bar-wrap">
-                <div class="prob-label">
-                    <span>{emoji} {cls.capitalize()}</span>
-                    <span><strong>{pct}%</strong></span>
-                </div>
-                <div class="prob-bar-bg">
-                    <div class="prob-bar-fill" style="width:{pct}%; background:{bar_color};"></div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        # Key signals
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown('<div class="section-label">🔎 Detected Signals</div>', unsafe_allow_html=True)
-
-        signals = []
-        if re.search(r'http|www', email_input):      signals.append("🔗 Contains URL")
-        if re.search(r'\S+@\S+', email_input):       signals.append("📬 Contains Email Address")
-        if email_input.count('!') > 2:               signals.append(f"❗ {email_input.count('!')} Exclamation Marks")
-        if email_input.count('$') > 0:               signals.append(f"💰 {email_input.count('$')} Dollar Signs")
-        if email_input.count('?') > 2:               signals.append(f"❓ {email_input.count('?')} Question Marks")
-        upper_ratio = sum(1 for c in email_input if c.isupper()) / max(len(email_input), 1)
-        if upper_ratio > 0.2:                        signals.append(f"🔠 {round(upper_ratio*100)}% Uppercase Text")
-
-        if signals:
-            pills = " ".join([f'<span class="metric-pill">{s}</span>' for s in signals])
-            st.markdown(f'<div>{pills}</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<span class="metric-pill">✅ No suspicious signals detected</span>', unsafe_allow_html=True)
+    if signals:
+        pills = " ".join([f'<span class="metric-pill">{s}</span>' for s in signals])
+        st.markdown(f'<div>{pills}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<span class="metric-pill">✅ No suspicious signals detected</span>', unsafe_allow_html=True)
 
 # ── How It Works ──────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
