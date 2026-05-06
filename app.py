@@ -301,52 +301,53 @@ st.markdown('<div class="section-label">⚡ Quick Test Samples</div>', unsafe_al
 col1, col2, col3 = st.columns(3)
 with col1:
     if st.button("🔴 Spam Sample"):
-        st.session_state.email_text = SAMPLES["🔴 Spam Example"]
+        st.session_state["email_textarea"] = SAMPLES["🔴 Spam Example"]
         st.session_state.result = None
+        st.rerun()
 with col2:
     if st.button("🟠 Phishing Sample"):
-        st.session_state.email_text = SAMPLES["🟠 Phishing Example"]
+        st.session_state["email_textarea"] = SAMPLES["🟠 Phishing Example"]
         st.session_state.result = None
+        st.rerun()
 with col3:
     if st.button("🟢 Legit Sample"):
-        st.session_state.email_text = SAMPLES["🟢 Legit Example"]
+        st.session_state["email_textarea"] = SAMPLES["🟢 Legit Example"]
         st.session_state.result = None
+        st.rerun()
 
 st.markdown('<br>', unsafe_allow_html=True)
 st.markdown('<div class="section-label">✏️ Or paste your own email</div>', unsafe_allow_html=True)
 
-# Key-bound text area — value syncs with session_state.email_text
+# text_area managed entirely by its key — do NOT pass value= when using key=
 email_input = st.text_area(
     label="Email content",
-    value=st.session_state.email_text,
     height=180,
     placeholder="Paste the email content here (subject + body)...",
     label_visibility="collapsed",
     key="email_textarea",
 )
-# Keep session state in sync with manual edits
-st.session_state.email_text = email_input
 
 col_btn, col_clear = st.columns([4, 1])
 with col_btn:
     classify_btn = st.button("🔍 Classify Email", use_container_width=True)
 with col_clear:
     if st.button("🗑️ Clear", use_container_width=True):
-        st.session_state.email_text = ""
+        st.session_state["email_textarea"] = ""
         st.session_state.result = None
         st.rerun()
 
 # ── Results ───────────────────────────────────────────────────
 if classify_btn:
-    if not st.session_state.email_text.strip():
+    current_email = st.session_state.get("email_textarea", "")
+    if not current_email.strip():
         st.warning("⚠️ Please enter some email text first.")
     else:
         with st.spinner("Analyzing email..."):
-            label, proba_dict = predict(st.session_state.email_text)
+            label, proba_dict = predict(current_email)
         st.session_state.result = {
             "label":      label,
             "proba_dict": proba_dict,
-            "text":       st.session_state.email_text,
+            "text":       current_email,
         }
 
 # Display stored result (persists across reruns)
