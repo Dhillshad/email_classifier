@@ -1,0 +1,36 @@
+# ── Virtual Environment ───────────────────────────────────────
+ml-env/
+venv/
+env/
+.venv/
+
+# ── Large Dataset (1.4 GB – exceeds GitHub's 100 MB limit) ────
+emails.csv
+
+# ── Jupyter Checkpoints ───────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Python Cache ──────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ── Trained Model Files (optional — uncomment to exclude) ─────
+# *.pkl
+
+# ── Generated Plot Images (optional — uncomment to exclude) ───
+# eda_overview.png
+# wordcloud.png
+# model_comparison.png
+# confusion_matrix.png
+# feature_importance.png
+# cross_validation.png
+
+# ── OS / Editor Files ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
